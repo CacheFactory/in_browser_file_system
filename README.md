@@ -1,6 +1,41 @@
-# Getting Started with Create React App
+# In browser file system
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+An in memory unix like file system that runs in your browser. 
+
+Available commands:
+```
+cd
+mkdir
+createFile
+ls
+cat
+mv
+cp
+pwdPath
+rm
+walk
+findByRegex
+```
+
+Example usage:
+```
+mkdir a/b/c : true
+createFile a/b/c/text.txt TEXT : true
+cat a/b/c/text.txt : TEXT
+cd a/b/c : true
+ls : text.txt
+mv text.txt /a/ : true
+ls :
+cd /a : true
+ls : b, text.txt
+cat text.txt : TEXT
+pwdPath : /a
+
+```
+
+# Demo
+
+Visit the demo running at [http://www.speedcali.com.s3-website-us-west-1.amazonaws.com/](http://www.speedcali.com.s3-website-us-west-1.amazonaws.com/)
 
 ## Available Scripts
 
