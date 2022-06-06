@@ -197,7 +197,7 @@ export class FileSystem {
     });
   }
 
-  _move(oldPath: string, newPath: string, copyOperation: boolean): boolean {
+  _move(oldPath: string, newPath: string, moveOperation: boolean): boolean {
     let entityName: string | undefined
     let success = false
 
@@ -252,7 +252,7 @@ export class FileSystem {
         }
       });
 
-      if (copyOperation && success) {
+      if (moveOperation && success) {
         this.rm(oldPath);
       }
       this._setParents(this.rootFolder)
@@ -271,11 +271,6 @@ export class FileSystem {
 
     let entity: FileSystemEntity | undefined = undefined;
     let success = false
-
-
-    if (!entityName) {
-      return undefined;
-    }
 
     let pathToNavigate = pathSplit.join("/");
 
