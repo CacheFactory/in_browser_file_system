@@ -30,9 +30,13 @@ export class FileSystem {
     const commandParts = command.split(" ");
     const commandName = commandParts[0];
     const commandArgs = commandParts.slice(1);
-    if (this.availableCommands().includes(commandName)) {
+    if (this.availableCommands().includes(commandName) ) {
       const commandFn = this[commandName as keyof FileSystem];
       if (commandFn) {
+        if((commandFn as Function).length !== commandArgs.length) {
+          return `${commandName} requires ${(commandFn as Function).length} arguments`
+        }
+
         let r = (commandFn as Function).apply(this, commandArgs);
         if (Array.isArray(r)) {
           r = r.join(", ");
@@ -47,11 +51,15 @@ export class FileSystem {
 
   cd(path: string): boolean {
     let tempPwd = this.pwd;
-    const success = this._navigate(path, {
+    let success = this._navigate(path, {
       atPath: (pwdRet: Folder) => {
         tempPwd = pwdRet;
       },
     });
+
+    if (this.pwd === tempPwd) {
+      success = false
+    }
 
     if (success) {
       this.pwd = tempPwd;
@@ -107,8 +115,8 @@ export class FileSystem {
         const newFile = new File(entityName, contents);
 
         if (newFile && newFile.validate()) {
-          pwdRet.add(newFile);
-          success = true;
+          success = pwdRet.add(newFile);
+
         }
       },
     });
@@ -215,20 +223,21 @@ export class FileSystem {
         path = "/";
       }
       
+
       this._navigate(path, {
         atPath: (pwdRet: Folder) => {
-          
           if (entity) {
-            
-            if (entityName && entity.constructor === File) {
-              (entity as FileSystemEntity).name = entityName;
+            const entityClone = entity.clone()
+            if (entityName && entityClone.constructor === File) {
+              (entityClone as FileSystemEntity).name = entityName;
             }
             
-            pwdRet.add(entity);
+            pwdRet.add(entityClone);
             success = true;
           }
         },
         missingPath: (folderNameToMake: string, pwdRet: Folder) => {
+          
           let newFolder = new Folder(folderNameToMake, pwdRet);
 
           if (folderNameToMake === pathSplit[pathSplit.length]) {
@@ -236,7 +245,7 @@ export class FileSystem {
           }
 
           if (newFolder && newFolder.validate()) {
-            pwdRet.add(newFolder);
+            pwdRet.add(newFolder.clone());
             return newFolder;
           }
           return newFolder;
@@ -246,24 +255,38 @@ export class FileSystem {
       if (copyOperation && success) {
         this.rm(oldPath);
       }
+      this._setParents(this.rootFolder)
     }
     return success;
   }
 
   _getEntity(path: string): FileSystemEntity | undefined {
     let pathSplit = path.split("/");
+
     let entityName = pathSplit.pop();
+
+    if (entityName === '') {
+      entityName = pathSplit.pop();
+    }
+
     let entity: FileSystemEntity | undefined = undefined;
     let success = false
+
 
     if (!entityName) {
       return undefined;
     }
+
+    let pathToNavigate = pathSplit.join("/");
+
+    if (pathToNavigate === '' && path[0] === '/') {
+      pathToNavigate = '/';
+    }
     
-    this._navigate(pathSplit.join("/"), {
+    this._navigate(pathToNavigate, {
       atPath: (pwdRet: Folder) => {
         if (entityName) {
-          entity = pwdRet.get(entityName)?.clone();
+          entity = pwdRet.get(entityName)
           success = true
         }
       },
@@ -315,6 +338,15 @@ export class FileSystem {
     this.pwd = currentPwd;
     return true;
   }
+
+  _setParents(folder: Folder) {
+    for(let children of folder.children) {
+      if(children.constructor === Folder) {
+        (children as Folder).parent = folder;
+        this._setParents(children as Folder);
+      }
+    }
+  }
 }
 
 class FileSystemEntity {
@@ -331,7 +363,7 @@ class FileSystemEntity {
   }
 }
 
-class File extends FileSystemEntity {
+export class File extends FileSystemEntity {
   contents: string;
   permissions: string;
   folder: Folder | undefined;
@@ -361,7 +393,7 @@ class File extends FileSystemEntity {
   }
 }
 
-class Folder extends FileSystemEntity {
+export class Folder extends FileSystemEntity {
   children: FileSystemEntity[];
   parent: Folder | undefined;
   constructor(name: string, parent?: Folder) {
@@ -373,6 +405,7 @@ class Folder extends FileSystemEntity {
   clone() {
     const folder = new Folder(this.name);
     folder.children = this.children.map((entity) => entity.clone());
+    folder.parent = this.parent
     return folder;
   }
 
@@ -386,7 +419,7 @@ class Folder extends FileSystemEntity {
 
   add(entity: FileSystemEntity): boolean {
     if (!this.has(entity.name)) {
-      this.children.push(entity);
+      
       if (entity.constructor === File) {
         let file = entity as File;
         file.setFolder(this);
@@ -396,6 +429,8 @@ class Folder extends FileSystemEntity {
         let folder = entity as Folder;
         folder.parent = this;
       }
+    
+      this.children.push(entity);
 
       return true;
     } else {

@@ -229,3 +229,32 @@ test('finds a file by regex', () => {
   const results2 = fs.findByRegex(/a/g);
   expect(results2).toBe("/folder/folder2/folder3/folder4/aaaaaa");
 }); 
+
+test('multi commands', () => {
+  const fs = new FileSystem();
+  fs.mkdir("/folder/folder2/folder3/folder4");
+  fs.createFile("a.txt", "123");
+  fs.mv("a.txt", "/folder/folder2/folder3/folder4")
+  fs.cd("/folder/folder2/folder3/folder4")
+  expect(fs.cat('a.txt')).toBe("123");
+
+  fs.createFile("/b.txt", "abc");
+  expect(fs.cat('/b.txt')).toBe("abc");
+
+  fs.cp('/b.txt', '/folder/folder2/folder3/folder4')
+  expect(fs.cat('b.txt')).toBe("abc");
+  expect(fs.pwdPath()).toBe("/folder/folder2/folder3/folder4");
+
+  fs.mkdir("/test");
+
+  expect(fs.mv('/folder/', '/test/')).toBe(true)
+  fs.cd('/test/folder/folder2/folder3/folder4')
+  
+  expect(fs.cat('b.txt')).toBe("abc");
+
+  expect(fs.pwdPath()).toBe("/test/folder/folder2/folder3/folder4");
+
+  fs.cd('/test')
+  expect(fs.pwdPath()).toBe("/test");
+  expect(fs.ls()).toEqual(['folder']);
+}); 
