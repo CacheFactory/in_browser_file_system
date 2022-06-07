@@ -41,6 +41,13 @@ test('changes directory', () => {
 
 }); 
 
+test('cd with bad params', () => {
+  const fs = new FileSystem();
+  fs.mkdir("folder");
+  expect(fs.cd("folder1")).toBe(false);
+  expect(fs.pwdPath()).toBe("/");
+}); 
+
 test('creates a file', () => {
   const fs = new FileSystem();
   fs.mkdir("folder");
@@ -55,9 +62,8 @@ test('mkdir directory with path', () => {
   fs.cd("folder2");
   fs.cd("folder3");
   expect(fs.pwd.name).toBe("folder3");
-  
+  expect(fs.pwdPath()).toBe("/folder/folder2/folder3");
 }); 
-
 
 test('changes directory to root', () => {
   const fs = new FileSystem();
@@ -99,7 +105,7 @@ test('get a file\'s contents', () => {
   expect(fs.cat('file.txt')).toBe(content);
 }); 
 
-test('get pwd string', () => {
+test('pwdPath string', () => {
   const fs = new FileSystem();
   fs.mkdir("folder");
   fs.cd("folder");
@@ -171,7 +177,7 @@ test('mv a file 2', () => {
 
 }); 
 
-test('mv a file to a new directory', () => {
+test('mv a file to a directory', () => {
   const fs = new FileSystem();
   const content = "BLA BLA BLA BLA BLA"
   fs.createFile("A", content);

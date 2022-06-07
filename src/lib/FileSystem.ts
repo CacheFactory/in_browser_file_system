@@ -51,17 +51,13 @@ export class FileSystem {
 
   cd(path: string): boolean {
     let tempPwd = this.pwd;
-    let success = this._navigate(path, {
+    this._navigate(path, {
       atPath: (pwdRet: Folder) => {
         tempPwd = pwdRet;
       },
     });
 
-    if (this.pwd === tempPwd) {
-      success = false
-    }
-
-    if (success) {
+    if (this.pwd !== tempPwd) {
       this.pwd = tempPwd;
       return true;
     } else {
@@ -89,13 +85,12 @@ export class FileSystem {
 
   rm(name: string): boolean {
     let success = false;
-    const pathSplit = name.split("/");
-    const fileName = pathSplit.pop();
+    const [pathToNavigate, entityName] = this._splitPath(name)
 
-    this._navigate(pathSplit.join("/"), {
+    this._navigate(pathToNavigate, {
       atPath: (pwdRet: Folder) => {
-        if (fileName) {
-          success = pwdRet.remove(fileName);
+        if (entityName) {
+          success = pwdRet.remove(entityName);
         }
       },
     });
@@ -103,20 +98,18 @@ export class FileSystem {
   }
 
   createFile(name: string, contents: string): boolean {
-    let pathSplit = name.split("/");
-    let entityName = pathSplit.pop();
     let success = false;
+    const [pathToNavigate, entityName] = this._splitPath(name)
 
-    this._navigate(pathSplit.join("/"), {
+    if (!entityName) {
+      return false;
+    }
+
+    this._navigate(pathToNavigate, {
       atPath: (pwdRet: Folder) => {
-        if (!entityName) {
-          return false;
-        }
         const newFile = new File(entityName, contents);
-
         if (newFile && newFile.validate()) {
           success = pwdRet.add(newFile);
-
         }
       },
     });
@@ -128,22 +121,19 @@ export class FileSystem {
   }
 
   cat(name: string): string | undefined {
-    const pathSplit = name.split("/");
-    const fileName = pathSplit.pop();
+    const [pathToNavigate, entityName] = this._splitPath(name)
     let file: File | undefined = undefined;
-    let success = false
 
-    this._navigate(pathSplit.join("/"), {
+    this._navigate(pathToNavigate, {
       atPath: (pwdRet: Folder) => {
-        if (fileName && pwdRet.hasFile(fileName)) {
-          file = pwdRet.getFile(fileName) as File;
-          success = true
+        if (entityName && pwdRet.hasFile(entityName)) {
+          file = pwdRet.getFile(entityName) as File;
         }
       },
     });
 
-    if (success) {
-      return file && (file as File).contents;
+    if (file) {
+      return (file as File).contents;
     }
 
     return undefined
@@ -198,57 +188,32 @@ export class FileSystem {
   }
 
   _move(oldPath: string, newPath: string, moveOperation: boolean): boolean {
-    let entityName: string | undefined
     let success = false
-
+    const [oldPathToNavigate, oldEntityName] = this._splitPath(oldPath)
     const entity = this._getEntity(oldPath);
+    const target = this._getEntity(newPath);
+    const targetIsFolder = target instanceof Folder;
+
 
     if (entity) {
-      const target = this._getEntity(newPath);
-      const targetIsFolder = target instanceof Folder;
+      let [pathToNavigate, entityName] = this._splitPath(newPath)
 
-      if(targetIsFolder) {
-        newPath = newPath + '/'
+      if (targetIsFolder) {
+        pathToNavigate = newPath;
+        entityName = oldEntityName
       }
 
-      const pathSplit = newPath.split("/");
-
-      if (entity && (entity as FileSystemEntity).constructor === File) {
-        entityName = pathSplit.pop();
-      }
-
-      let path = pathSplit.join("/");
-
-      if (newPath === '/') {
-        path = "/";
-      }
-      
-
-      this._navigate(path, {
+      this._navigate(pathToNavigate, {
         atPath: (pwdRet: Folder) => {
-          if (entity) {
-            const entityClone = entity.clone()
-            if (entityName && entityClone.constructor === File) {
-              (entityClone as FileSystemEntity).name = entityName;
-            }
-            
-            pwdRet.add(entityClone);
-            success = true;
+          const entityClone = entity.clone()
+          if (!targetIsFolder && entityName && entityClone.constructor === File) {
+            (entityClone as FileSystemEntity).name = entityName;
           }
-        },
-        missingPath: (folderNameToMake: string, pwdRet: Folder) => {
-          
-          let newFolder = new Folder(folderNameToMake, pwdRet);
-
-          if (folderNameToMake === pathSplit[pathSplit.length]) {
-            newFolder = entity as Folder;
+          if (entityClone.constructor === Folder) {
+            (entityClone as Folder).name = entityName
           }
-
-          if (newFolder && newFolder.validate()) {
-            pwdRet.add(newFolder.clone());
-            return newFolder;
-          }
-          return newFolder;
+          pwdRet.add(entityClone);
+          success = true;
         }
       });
 
@@ -261,23 +226,11 @@ export class FileSystem {
   }
 
   _getEntity(path: string): FileSystemEntity | undefined {
-    let pathSplit = path.split("/");
-
-    let entityName = pathSplit.pop();
-
-    if (entityName === '') {
-      entityName = pathSplit.pop();
-    }
+    const [pathToNavigate, entityName] = this._splitPath(path)
 
     let entity: FileSystemEntity | undefined = undefined;
     let success = false
 
-    let pathToNavigate = pathSplit.join("/");
-
-    if (pathToNavigate === '' && path[0] === '/') {
-      pathToNavigate = '/';
-    }
-    
     this._navigate(pathToNavigate, {
       atPath: (pwdRet: Folder) => {
         if (entityName) {
@@ -292,6 +245,23 @@ export class FileSystem {
     }
 
     return undefined
+  }
+
+  _splitPath(path:string): [string, string] {
+    const pathSplit = path.split("/");
+    let entityName = pathSplit.pop();
+
+    if (entityName === '') {
+      entityName = pathSplit.pop();
+    }
+
+    let pathToNavigate = pathSplit.join("/");
+
+    if (pathToNavigate === '' && path[0] === '/') {
+      pathToNavigate = '/';
+    }
+
+    return [pathToNavigate, entityName || '']; 
   }
 
   _walk(folder: Folder, callback: (folder: Folder) => boolean) {
@@ -416,13 +386,11 @@ export class Folder extends FileSystemEntity {
     if (!this.has(entity.name)) {
       
       if (entity.constructor === File) {
-        let file = entity as File;
-        file.setFolder(this);
+        (entity as File).setFolder(this);
       }
 
       if (entity.constructor === Folder) {
-        let folder = entity as Folder;
-        folder.parent = this;
+        (entity as Folder).parent = this;
       }
     
       this.children.push(entity);
