@@ -206,13 +206,16 @@ export class FileSystem {
       this._navigate(pathToNavigate, {
         atPath: (pwdRet: Folder) => {
           const entityClone = entity.clone()
-          if (!targetIsFolder && entityName && entityClone.constructor === File) {
+          if ((!targetIsFolder && entityName && entityClone.constructor === File) || entityClone.constructor === Folder) {
             (entityClone as FileSystemEntity).name = entityName;
           }
-          if (entityClone.constructor === Folder) {
-            (entityClone as Folder).name = entityName
+
+          if (moveOperation && entityClone?.constructor === File && target?.constructor === File) {
+            (target as File).contents = (entity as File).contents;
+
+          } else {
+            pwdRet.add(entityClone);
           }
-          pwdRet.add(entityClone);
           success = true;
         }
       });
@@ -279,7 +282,7 @@ export class FileSystem {
     if (path[0] === "/") {
       this.pwd = this.rootFolder;
     }
-
+    //let current = this.pwd
     const folders = path.split("/").filter((folder) => folder !== "");
 
     for (let folderName of folders) {

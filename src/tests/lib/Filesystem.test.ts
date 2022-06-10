@@ -264,3 +264,14 @@ test('multi commands', () => {
   expect(fs.pwdPath()).toBe("/test");
   expect(fs.ls()).toEqual(['folder']);
 }); 
+
+test('mv a file to another file', () => {
+  const fs = new FileSystem();
+  fs.createFile('foo.txt', 'FOO')
+  fs.createFile('bar.txt', 'BAR')
+  fs.mv('foo.txt', 'bar.txt')
+  expect(fs.cat('bar.txt')).toEqual('FOO')
+  expect(fs.ls()).toEqual(['bar.txt'])
+}); 
+
+
